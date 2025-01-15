@@ -32,18 +32,18 @@ public:
             return;
         }
 
-        if (_head->key == key) {
-            _head->value = value;
-            return;
-        }
-
         Node<key_type, value_type>* temp = _head.get();
-        while (temp && temp->next) {
-            if (temp->next->key == key) {
-                temp->next->value = value;
+        while (temp) {
+            if (temp->key == key) {
+                temp->value = std::move(value);
                 return;
             }
-            temp = temp->next.get();
+
+            if (temp->next) {
+                temp = temp->next.get();
+            } else {
+                break;
+            }
         }
 
         temp->next = std::make_unique<Node<key_type, value_type>>(key, value);
@@ -64,7 +64,7 @@ public:
 
     void delete_by_key(const key_type& key) {
         if (!_head) {
-            std::cerr << "DELETE ERROR 1: " << key << " not found!" << std::endl;
+            std::cerr << "DELETE ERROR: " << key << " not found!" << std::endl;
             return;
         }
 
