@@ -16,97 +16,50 @@
 
 
 struct Request {
-    enum class Operation { INSERT, READ, DELETE } operation;
+    enum class Operation {
+        INSERT, READ, DELETE
+    } operation;
     std::string key;
     std::string value;
 
-    Request(Operation operation, std::string key, std::string  value) : operation(operation), key(std::move(key)), value(std::move(value)) {}
+    Request(Operation operation, std::string key, std::string value) : operation(operation), key(std::move(key)),
+                                                                       value(std::move(value)) {}
 
     Request(Operation operation, std::string key) : operation(operation), key(std::move(key)) {}
 };
 
-const size_t buffer_size = 10;
+#define BUFFER_SIZE 20
+#define SHM_SIZE sizeof(Request) + BUFFER_SIZE + sizeof(size_t) + sizeof(size_t) + sizeof(pthread_mutex_t) + sizeof(pthread_cond_t) + sizeof(pthread_cond_t) + sizeof(bool)
 
 struct SharedMemory {
-    std::array<Request, buffer_size> requests;
+    Request requests[BUFFER_SIZE];
     size_t read_index = 0;
     size_t write_index = 0;
-    bool is_empty = true;
-    bool is_full = false;
+    pthread_mutex_t mutex;
+    pthread_cond_t is_not_full;
+    pthread_cond_t is_not_empty;
+    bool is_running;
 };
 
-#define SHM_SIZE sizeof(SharedMemory)
-
-std::mutex shared_memory_mutex;
-
-// Server
-std::atomic<bool> is_running;
-
-void sigint_handler(int signal) {
-    if (signal == SIGINT) {
-        is_running.store(false);
-        std::printf("\nSIGINT received. Server is shutting down!\n");
-    }
+void initialize_mutex(SharedMemory *shared_memory) {
+    pthread_mutexattr_t mutex_attr;
+    pthread_mutexattr_init(&mutex_attr);
+    pthread_mutexattr_setpshared(&mutex_attr, PTHREAD_PROCESS_SHARED);
+    pthread_mutex_init(&shared_memory->mutex, &mutex_attr);
 }
 
-void process_requests(SharedMemory* shared_memory, HashTable<std::string, std::string>& hash_table) {
-    is_running.store(true);
-    while(is_running) {
-        if (shared_memory->is_empty) {
-            std::this_thread::sleep_for(std::chrono::milliseconds(100));
-            continue;
-        }
-
-        std::lock_guard<std::mutex> lock(shared_memory_mutex);
-        if (!shared_memory->is_empty) {
-            auto &request = shared_memory->requests[shared_memory->read_index];
-            switch (request.operation) {
-                case Request::Operation::INSERT:
-                    hash_table.insert(request.key, request.value);
-                    break;
-                case Request::Operation::READ:
-                    hash_table.read_by_key(request.key);
-                    break;
-                case Request::Operation::DELETE:
-                    hash_table.delete_by_key(request.key);
-                    break;
-            }
-
-            shared_memory->read_index = (shared_memory->read_index + 1) % buffer_size;
-            if (shared_memory->read_index == shared_memory->write_index) {
-                shared_memory->is_empty = true;
-            }
-
-            shared_memory->is_full = false;
-        }
-    }
+void initialize_conditions(SharedMemory *shared_memory) {
+    pthread_condattr_t cond_attr;
+    pthread_condattr_init(&cond_attr);
+    pthread_condattr_setpshared(&cond_attr, PTHREAD_PROCESS_SHARED);
+    pthread_cond_init(&shared_memory->is_not_full, &cond_attr);
+    pthread_cond_init(&shared_memory->is_not_empty, &cond_attr);
 }
 
-
-// Client
-void enqueue_request(SharedMemory* shared_memory, const Request& request) {
-    while (shared_memory->is_full) {
-        std::this_thread::sleep_for(std::chrono::milliseconds(100));
-    }
-
-    std::lock_guard<std::mutex> shared_memory_lock(shared_memory_mutex);
-    shared_memory->requests[shared_memory->write_index] = request;
-    shared_memory->write_index = (shared_memory->write_index + 1) % buffer_size;
-    if ((shared_memory->write_index + 1) % buffer_size == shared_memory->read_index) {
-        shared_memory->is_full = true;
-    }
-    shared_memory->is_empty = false;
-}
-
-void client_thread(SharedMemory* shared_memory, int id) {
-    for (int i = 0; i < 5; i++) {
-        std::string key = "key" + std::to_string(id * 10 + i);
-        std::string value = "value" + std::to_string(id * 10 + i);
-
-        enqueue_request(shared_memory, Request(Request::Operation::INSERT, key, value));
-        enqueue_request(shared_memory, Request(Request::Operation::READ, key));
-        enqueue_request(shared_memory, Request(Request::Operation::DELETE, key));
-    }
+void clean_up_mutex(SharedMemory *shared_memory) {
+    pthread_mutex_destroy(&shared_memory->mutex);
+    pthread_cond_destroy(&shared_memory->is_not_full);
+    pthread_cond_destroy(&shared_memory->is_not_empty);
 }
 
 #endif //SERVER_SHARED_MEMORY_H

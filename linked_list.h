@@ -5,7 +5,7 @@
 #include <iostream>
 #include <optional>
 
-template <typename K, typename T>
+template<typename K, typename T>
 struct Node {
 public:
     using key_type = K;
@@ -13,12 +13,12 @@ public:
 
     key_type key;
     value_type value;
-    std::unique_ptr<Node<key_type , value_type>> next;
+    std::unique_ptr<Node<key_type, value_type>> next;
 
-    Node(key_type key, value_type value) : key(key), value(value), next(nullptr) {}
+    Node(key_type key, value_type value) : key(std::move(key)), value(std::move(value)), next(nullptr) {}
 };
 
-template <typename K, typename T>
+template<typename K, typename T>
 class LinkedList {
 public:
     using key_type = K;
@@ -32,7 +32,7 @@ public:
             return;
         }
 
-        Node<key_type, value_type>* temp = _head.get();
+        Node<key_type, value_type> *temp = _head.get();
         while (temp) {
             if (temp->key == key) {
                 temp->value = std::move(value);
@@ -49,8 +49,8 @@ public:
         temp->next = std::make_unique<Node<key_type, value_type>>(key, value);
     }
 
-    std::optional<value_type> read_by_key(const key_type& key) {
-        Node<key_type, value_type>* temp = _head.get();
+    std::optional<value_type> read_by_key(const key_type &key) {
+        Node<key_type, value_type> *temp = _head.get();
         while (temp) {
             if (temp->key == key) {
                 return temp->value;
@@ -62,7 +62,7 @@ public:
         return std::nullopt;
     }
 
-    void delete_by_key(const key_type& key) {
+    void delete_by_key(const key_type &key) {
         if (!_head) {
             std::cerr << "DELETE ERROR: " << key << " not found!" << std::endl;
             return;
@@ -73,7 +73,7 @@ public:
             return;
         }
 
-        Node<key_type, value_type>* temp = _head.get();
+        Node<key_type, value_type> *temp = _head.get();
         while (temp && temp->next) {
             if (temp->next->key == key) {
                 temp->next = std::move(temp->next->next);
@@ -82,8 +82,9 @@ public:
             temp = temp->next.get();
         }
 
-        std::cerr << "DELETE ERROR 2: " << key << " not found!" << std::endl;
+        std::cerr << "DELETE ERROR: " << key << " not found!" << std::endl;
     }
+
 private:
     std::unique_ptr<Node<key_type, value_type>> _head;
 };
