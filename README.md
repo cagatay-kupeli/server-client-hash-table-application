@@ -41,6 +41,12 @@ Run the server by specifying the hash table size and the number of threads:
 Run the client by specifying the number of threads:
 
 ```
+./build/client <num_threads>
+```
+
+**Example:**
+
+```
 ./build/client 5
 ```
 
