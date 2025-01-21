@@ -4,7 +4,6 @@
 #include <unistd.h>
 #include <csignal>
 #include <cstring>
-#include <vector>
 
 #include "shared_memory.h"
 #include "hash_map.h"
@@ -21,7 +20,7 @@ struct ServerThreadData {
 
 // Executed by each server thread
 void *server_thread(void *arg) {
-    auto *data = (ServerThreadData *) arg;
+    auto *data = static_cast<ServerThreadData *>(arg);
     SharedMemory *shared_memory = data->shared_memory;
     HashTable<std::string, std::string> *hash_table = data->hash_table;
     int id = data->id;
@@ -178,7 +177,7 @@ int main(int argc, char *argv[]) {
         thread_arguments[i].shared_memory = global_shared_memory;
         thread_arguments[i].hash_table = &hash_table;
         thread_arguments[i].id = i;
-        if (pthread_create(&threads[i], nullptr, server_thread, (void *) &thread_arguments[i]) != 0) {
+        if (pthread_create(&threads[i], nullptr, server_thread, static_cast<void *>(&thread_arguments[i])) != 0) {
             std::perror("pthread_create");
             continue;
         }
