@@ -30,9 +30,9 @@ void enqueue_request(SharedMemory *shared_memory, const Request &request, int id
     // Move the write index for the circular buffer
     shared_memory->write_index = (shared_memory->write_index + 1) % BUFFER_SIZE;
 
-    pthread_mutex_unlock(&shared_memory->mutex);
     // Notify server threads that buffer is not empty
     pthread_cond_signal(&shared_memory->is_not_empty);
+    pthread_mutex_unlock(&shared_memory->mutex);
 }
 
 struct ClientThreadData {
@@ -41,7 +41,7 @@ struct ClientThreadData {
 };
 
 void *client_thread(void *arg) {
-    auto *data = (ClientThreadData *) arg;
+    auto data = static_cast<ClientThreadData *>(arg);
     SharedMemory *shared_memory = data->shared_memory;
     int id = data->id;
 
@@ -53,6 +53,7 @@ void *client_thread(void *arg) {
         enqueue_request(shared_memory, Request(Request::Operation::READ, key), id);
         enqueue_request(shared_memory, Request(Request::Operation::DELETE, key), id);
     }
+
     return nullptr;
 }
 
@@ -86,8 +87,8 @@ int main(int argc, char *argv[]) {
     }
 
     // Map the shared memory into the process' memory address
-    auto *shared_memory = (SharedMemory *) mmap(nullptr, SHM_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED,
-                                                shared_memory_file_description, 0);
+    auto *shared_memory = static_cast<SharedMemory *>(mmap(nullptr, SHM_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED,
+                                                shared_memory_file_description, 0));
     if (shared_memory == MAP_FAILED) {
         std::perror("mmap");
         close(shared_memory_file_description);
@@ -95,15 +96,15 @@ int main(int argc, char *argv[]) {
     }
 
     // Creating client threads
-    std::vector<pthread_t> threads;
+    pthread_t threads[num_threads];
+    ClientThreadData thread_arguments[num_threads];
     for (int i = 0; i < num_threads; i++) {
-        pthread_t thread;
-        ClientThreadData thread_data = {shared_memory, i};
-        if (pthread_create(&thread, nullptr, client_thread, (void *) &thread_data) != 0) {
+        thread_arguments[i].shared_memory = shared_memory;
+        thread_arguments[i].id = i;
+        if (pthread_create(&threads[i], nullptr, client_thread, static_cast<void *>(&thread_arguments[i])) != 0) {
             std::perror("pthread_create");
             continue;
         }
-        threads.push_back(thread);
     }
 
     // Waiting for all the client threads to finish

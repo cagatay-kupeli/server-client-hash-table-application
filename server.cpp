@@ -66,9 +66,9 @@ void *server_thread(void *arg) {
         // Move the read index for the circular buffer
         shared_memory->read_index = (shared_memory->read_index + 1) % BUFFER_SIZE;;
 
-        pthread_mutex_unlock(&shared_memory->mutex);
         // Notify client threads that buffer is not full
         pthread_cond_signal(&shared_memory->is_not_full);
+        pthread_mutex_unlock(&shared_memory->mutex);
     }
 
     return nullptr;
@@ -172,15 +172,16 @@ int main(int argc, char *argv[]) {
     register_signal_action();
 
     // Creating server threads
-    std::vector<pthread_t> threads;
+    pthread_t threads[num_threads];
+    ServerThreadData thread_arguments[num_threads];
     for (int i = 0; i < num_threads; i++) {
-        pthread_t thread;
-        ServerThreadData thread_data = {global_shared_memory, &hash_table, i};
-        if (pthread_create(&thread, nullptr, server_thread, (void *) &thread_data) != 0) {
+        thread_arguments[i].shared_memory = global_shared_memory;
+        thread_arguments[i].hash_table = &hash_table;
+        thread_arguments[i].id = i;
+        if (pthread_create(&threads[i], nullptr, server_thread, (void *) &thread_arguments[i]) != 0) {
             std::perror("pthread_create");
             continue;
         }
-        threads.push_back(thread);
     }
 
     // Waiting for all the server threads to finish
