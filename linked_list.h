@@ -58,13 +58,13 @@ public:
             temp = temp->next.get();
         }
 
-        std::cerr << "READ ERROR: " << key << " not found!" << std::endl;
+        std::cerr << "\033[1;31mREAD ERROR: " << key << " not found!\033[0m" << std::endl;
         return std::nullopt;
     }
 
     void delete_by_key(const key_type &key) {
         if (!_head) {
-            std::cerr << "DELETE ERROR: " << key << " not found!" << std::endl;
+            std::cerr << "\033[1;31mDELETE ERROR: " << key << " not found!\033[0m" << std::endl;
             return;
         }
 
@@ -82,7 +82,7 @@ public:
             temp = temp->next.get();
         }
 
-        std::cerr << "DELETE ERROR: " << key << " not found!" << std::endl;
+        std::cerr << "\033[1;31mDELETE ERROR: " << key << " not found!\033[0m" << std::endl;
     }
 
 private:
